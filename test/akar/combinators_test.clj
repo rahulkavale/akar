@@ -2,107 +2,91 @@
   (:require [clojure.test :refer :all]
             [akar.patterns :refer :all]
             [akar.combinators :refer :all]
-            [akar.primitives :refer :all]))
+            [akar.primitives :refer :all])
+  (:use midje.sweet))
 
 (deftest combinators-test
 
-  (testing "!and"
+  (facts "!and"
 
-    (testing "fails if any of the patterns fails"
-      (is (= nil
-             ((!and !any !bind !fail) 9))))
+         (fact "fails if any of the patterns fails"
+               ((!and !any !bind !fail) 9) => nil)
 
-    (testing "emits all the values, when all patterns succeed"
-      (is (= [9 9]
-             ((!and !any !bind !bind) 9))))
+         (fact "emits all the values, when all patterns succeed"
+               ((!and !any !bind !bind) 9) => [9 9])
 
-    (testing "succeeds if no patterns are available"
-      (is (= []
-             ((!and) 9)))))
+         (fact "succeeds if no patterns are available"
+               ((!and) 9) => []))
 
-  (testing "!or"
+  (facts "!or"
 
-    (testing "fails if no pattern succeeds"
-      (is (= nil
-             ((!or !fail !fail !fail) 9))))
+         (fact "fails if no pattern succeeds"
+               ((!or !fail !fail !fail) 9) => nil)
 
-    (testing "emits values from the first matched pattern"
-      (is (= []
-             ((!or !any !bind) 9)))
-      (is (= [9]
-             ((!or !bind !any) 9))))
+         (fact "emits values from the first matched pattern"
+               ((!or !any !bind) 9) => []
+               ((!or !bind !fail) 9) => [9])
 
-    (testing "fails if no pattern is available"
-      (is (= nil
-             ((!or) 9)))))
+         (fact "fails if no pattern is available"
+               ((!or) 9) => nil))
 
-  (testing "!not"
+  (facts "!not"
 
-    (testing "reverses a good match"
-      (is (= nil
-             ((!not !bind) 9))))
+         (fact "reverses a good match"
+               ((!not !bind) 9) => nil)
 
-    (testing "reverses a bad match"
-      (is (= []
-             ((!not !fail) 9)))))
+         (fact "reverses a bad match"
+               ((!not !fail) 9) => []))
 
-  (testing "!at"
+  (facts "!at"
 
-    (testing "if matched, gives the same input"
-      (is (= 2
-             (try-match* 2 (clauses*
-                             (!at (!pred even?)) (fn [x] x))))))
+         ;; this can be a simple !at with a predicate why need try-match
+         (fact "if matched, gives the same input"
+               (try-match* 2 (clauses*
+                              (!at (!pred even?)) (fn [x] x))) => 2)
+         ;; ((!at (!pred even?)) 2) => 2
 
-    (testing "if not matched, gives nothing"
-      (is (= clause-not-applied
-             (try-match* 3 (clauses*
-                             (!at (!pred even?)) (fn [x] x)))))))
+         (fact "if not matched, gives nothing"
+               (try-match* 3 (clauses*
+                              (!at (!pred even?)) (fn [x] x))) => clause-not-applied))
 
-  (testing "!guard"
+  (facts "!guard"
 
-    (testing "original pattern succeeds, only if guard succeeds too"
-      (is (= :even-and-2
-             (try-match* 2 (clauses*
-                             (!guard (!pred even?) (partial = 2)) (fn [] :even-and-2))))))
+         (fact "original pattern succeeds, only if guard succeeds too"
+               (try-match* 2 (clauses*
+                              (!guard (!pred even?) (partial = 2)) (fn [] :even-and-2))) => :even-and-2)
 
-    (testing "original pattern fails, if the guard fails"
-      (is (= clause-not-applied
-             (try-match* 4 (clauses*
-                             (!guard (!pred even?) (partial = 2)) (fn [] :even-and-2)))))))
+         (fact "original pattern fails, if the guard fails"
+               (try-match* 4 (clauses*
+                              (!guard (!pred even?) (partial = 2)) (fn [] :even-and-2))) => clause-not-applied))
 
-  (testing "!view"
+  (facts "!view"
 
-    (let [block (clauses*
-                  (!view inc !bind) (fn [x] x))]
-      (is (= 10
-             (match* 9 block)))))
+         (let [block (clauses*
+                      (!view inc !bind) (fn [x] x))]
+           (match* 9 block) => 10))
 
-  (testing "!further"
-    (let [block (clauses*
-                  (!further !cons [!bind !bind]) (fn [hd tl]
-                                                   {:hd hd
-                                                    :tl tl}))]
-      (testing "'furthers' a pattern"
-        (is (= {:hd 3 :tl [4 5]}
-               (match* [3 4 5] block))))))
+  (facts "!further"
+         (let [block (clauses*
+                      (!further !cons [!bind !bind]) (fn [hd tl]
+                                                       {:hd hd
+                                                        :tl tl}))]
+           (fact "'furthers' a pattern"
+                 (is (= {:hd 3 :tl [4 5]}
+                        (match* [3 4 5] block))))))
 
-  (testing "!further-many"
+  (facts "!further-many"
 
-    (testing "'furthers' a pattern into variadic patterns list"
-      (let [block (clauses*
-                    (!further-many !seq [!bind !any !true !bind]) (fn [x y] [x y]))]
-        (is (= [1 3]
-               (try-match* [1 :whatevs true 3] block)))
-        (is (= clause-not-applied
-               (try-match* [1 :whatevs false] block)))))
+         (fact "'furthers' a pattern into variadic patterns list"
+               (let [block (clauses*
+                            (!further-many !seq [!bind !any !true !bind]) (fn [x y] [x y]))]
+                 (try-match* [1 :whatevs true 3] block) => [1 3]
+                 (try-match* [1 :whatevs false] block) => clause-not-applied))
 
-    (testing "supports 'rest' patterns"
-      (let [block (clauses*
-                    (!further-many !seq [!bind !bind] !bind) (fn [a b rest]
-                                                               [a b rest]))]
-        (is (= [3 4 [5 6]]
-               (try-match* [3 4 5 6] block)))
-        (is (= [3 4 []]
-               (try-match* [3 4] block)))
-        (is (= clause-not-applied
-               (try-match* [3] block)))))))
+         (fact "supports 'rest' patterns"
+               (let [block (clauses*
+                            (!further-many !seq [!bind !bind] !bind) (fn [a b rest]
+                                                                       [a b rest]))]
+                 (try-match* [3 4 5 6] block) => [3 4 [5 6]]
+                 (try-match* [3 4] block) => [3 4 []]
+                 (try-match* [3] block) => clause-not-applied))))
