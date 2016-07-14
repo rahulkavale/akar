@@ -5,7 +5,9 @@
             :distribution :repo}
   :signing {:gpg-key "F5EEC7BF"}
   :dependencies [[org.clojure/clojure "1.8.0"]
-                 [n01se/seqex "2.0.1"]]
-  :profiles {:dev {:plugins [[jonase/eastwood "0.2.3"]]}}
+                 [n01se/seqex "2.0.1"]
+                 [midje "1.8.3"]]
+  :profiles {:dev {:plugins [[jonase/eastwood "0.2.3"]
+                             [lein-midje "3.2"]]}}
   :aliases {"et" ["do" ["eastwood"] ["test"]]}
   :main akar.try-out)
